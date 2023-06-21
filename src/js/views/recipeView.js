@@ -3,7 +3,7 @@ import View from './view';
 import icons from 'url:../../img/icons.svg';
 import { Fraction } from 'fractional';
 
-class recipeView extends View {
+class RecipeView extends View {
   _parentEl = document.querySelector('.recipe');
   _errorMessage = 'We could not find the recipe. Please, try again!';
   _successMessage =
@@ -116,4 +116,4 @@ class recipeView extends View {
   }
 }
 
-export default new recipeView();
+export default new RecipeView();

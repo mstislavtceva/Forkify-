@@ -1,16 +1,17 @@
 import * as model from './model';
-import recipeView from './views/recipeView';
-import searchView from './views/searchView';
-import resultsView from './views/resultsView';
+import RecipeView from './views/recipeView';
+import SearchView from './views/searchView';
+import ResultsView from './views/resultsView';
+import PaginationView from './views/paginationView';
 
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 
 // https://forkify-api.herokuapp.com/v2
 
-if (module.hot) {
-  module.hot.accept();
-}
+// if (module.hot) {
+//   module.hot.accept();
+// }
 
 ///////////////////////////////////////
 const controlRecipes = async function () {
@@ -19,40 +20,52 @@ const controlRecipes = async function () {
     if (!id) return;
 
     // Render Spinner before loading
-    recipeView.renderSpinner();
+    RecipeView.renderSpinner();
 
     // 1.) Loading recipe
     await model.loadRecipe(id);
     const { recipe } = model.state;
 
     // 2.) Rendering recipe
-    recipeView.render(recipe);
+    RecipeView.render(recipe);
   } catch (err) {
-    recipeView.renderError();
+    RecipeView.renderError();
   }
 };
 
 const controlSearchResults = async function () {
   try {
     // Render Spinner before loading
-    resultsView.renderSpinner();
+    ResultsView.renderSpinner();
 
     // 1.) Get search query
-    const query = searchView.getQuery();
+    const query = SearchView.getQuery();
     if (!query) return;
 
     // 2.) Load search results
     await model.loadSearchResults(query);
 
     // 3.) Render results
-    resultsView.render(model.state.search.results);
+    ResultsView.render(model.getSearchResultsPage());
+
+    // 4.) Render initial pagintaion buttons
+    PaginationView.render(model.state.search);
   } catch (err) {
     console.log(err);
   }
 };
 
+const controlPagination = function (goToPage) {
+  // 3.) Render NEW results
+  ResultsView.render(model.getSearchResultsPage(goToPage));
+
+  // 4.) Render NEW pagintaion buttons
+  PaginationView.render(model.state.search);
+};
+
 const init = function () {
-  recipeView.addHandlerRender(controlRecipes);
-  searchView.addHandlerSearch(controlSearchResults);
+  RecipeView.addHandlerRender(controlRecipes);
+  SearchView.addHandlerSearch(controlSearchResults);
+  PaginationView.addHandlerClick(controlPagination);
 };
 init();
