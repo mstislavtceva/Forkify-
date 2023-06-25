@@ -597,6 +597,8 @@ const controlRecipes = async function() {
         if (!id) return;
         // Render Spinner before loading
         (0, _recipeViewDefault.default).renderSpinner();
+        // 0.) Update results view to mark selected search result
+        (0, _resultsViewDefault.default).update(_model.getSearchResultsPage());
         // 1.) Loading recipe
         await _model.loadRecipe(id);
         const { recipe  } = _model.state;
@@ -629,10 +631,18 @@ const controlPagination = function(goToPage) {
     // 4.) Render NEW pagintaion buttons
     (0, _paginationViewDefault.default).render(_model.state.search);
 };
+const controlServings = function(newServings) {
+    // Update the recipe servings (in state)
+    _model.updateServings(newServings);
+    // Update the recipe view
+    // RecipeView.render(model.state.recipe);
+    (0, _recipeViewDefault.default).update(_model.state.recipe);
+};
 const init = function() {
     (0, _recipeViewDefault.default).addHandlerRender(controlRecipes);
     (0, _searchViewDefault.default).addHandlerSearch(controlSearchResults);
     (0, _paginationViewDefault.default).addHandlerClick(controlPagination);
+    (0, _recipeViewDefault.default).addHandlerUpdateServings(controlServings);
 };
 init();
 
@@ -2572,6 +2582,7 @@ parcelHelpers.export(exports, "state", ()=>state);
 parcelHelpers.export(exports, "loadRecipe", ()=>loadRecipe);
 parcelHelpers.export(exports, "loadSearchResults", ()=>loadSearchResults);
 parcelHelpers.export(exports, "getSearchResultsPage", ()=>getSearchResultsPage);
+parcelHelpers.export(exports, "updateServings", ()=>updateServings);
 var _regeneratorRuntime = require("regenerator-runtime");
 var _regeneratorRuntimeDefault = parcelHelpers.interopDefault(_regeneratorRuntime);
 var _config = require("./config");
@@ -2625,6 +2636,12 @@ const getSearchResultsPage = function(page = state.search.page) {
     const start = (page - 1) * state.search.resultsPerPage; // 0
     const end = page * state.search.resultsPerPage; // 9
     return state.search.results.slice(start, end);
+};
+const updateServings = function(newServings) {
+    state.recipe.ingredients.forEach((ing)=>{
+        ing.quantity = ing.quantity * newServings / state.recipe.servings;
+    });
+    state.recipe.servings = newServings;
 };
 
 },{"regenerator-runtime":"dXNgZ","./config":"k5Hzs","./helpers":"hGI1E","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"k5Hzs":[function(require,module,exports) {
@@ -2705,12 +2722,12 @@ class RecipeView extends (0, _viewDefault.default) {
           <span class="recipe__info-text">servings</span>
 
           <div class="recipe__info-buttons">
-            <button class="btn--tiny btn--increase-servings">
+            <button class="btn--tiny btn--update-servings" data-update-to=${this._data.servings - 1}>
               <svg>
                 <use href="${0, _iconsSvgDefault.default}#icon-minus-circle"></use>
               </svg>
             </button>
-            <button class="btn--tiny btn--increase-servings">
+            <button class="btn--tiny btn--update-servings" data-update-to=${this._data.servings + 1}>
               <svg>
                 <use href="${0, _iconsSvgDefault.default}#icon-plus-circle"></use>
               </svg>
@@ -2770,11 +2787,19 @@ class RecipeView extends (0, _viewDefault.default) {
           </li>
     `;
     }
-    addHandlerRender(handle) {
+    addHandlerRender(handler) {
         [
             "hashchange",
             "load"
-        ].forEach((event)=>window.addEventListener(event, handle));
+        ].forEach((event)=>window.addEventListener(event, handler));
+    }
+    addHandlerUpdateServings(handler) {
+        this._parentEl.addEventListener("click", function(e) {
+            const btn = e.target.closest(".btn--update-servings");
+            if (!btn) return;
+            const { updateTo  } = btn.dataset;
+            if (+updateTo > 0 && +updateTo < 10) handler(+updateTo);
+        });
     }
 }
 exports.default = new RecipeView();
@@ -2831,6 +2856,22 @@ class View {
         const markup = this._generateMarkup();
         this._clear();
         this._parentEl.insertAdjacentHTML("afterbegin", markup);
+    }
+    update(data) {
+        this._data = data;
+        const newMarkup = this._generateMarkup();
+        const newDOM = document.createRange().createContextualFragment(newMarkup);
+        const newElements = Array.from(newDOM.querySelectorAll("*"));
+        const curElements = Array.from(this._parentEl.querySelectorAll("*"));
+        newElements.forEach((newEl, i)=>{
+            const curEl = curElements[i];
+            console.log(curEl, newEl.isEqualNode(curEl));
+            // Update changed TEXT
+            if (!newEl.isEqualNode(curEl) && newEl.firstChild?.nodeValue.trim() !== "") // console.log('🙄', newEl.firstChild.nodeValue.trim());
+            curEl.textContent = newEl.textContent;
+            // Update changed ATTRIBUTES
+            if (!newEl.isEqualNode(curEl)) Array.from(newEl.attributes).forEach((attr)=>curEl.setAttribute(attr.name, attr.value));
+        });
     }
     _clear() {
         this._parentEl.innerHTML = "";
@@ -3166,9 +3207,10 @@ class ResultsView extends (0, _viewDefault.default) {
         return this._data.map(this._generateMarkupPreview).join("");
     }
     _generateMarkupPreview(result) {
+        const id = window.location.hash.slice(1);
         return `
         <li class="preview">
-            <a class="preview__link" href="#${result.id}">
+            <a class="preview__link ${result.id === id ? "preview__link--active" : ""}" href="#${result.id}">
                 <figure class="preview__fig">
                     <img src="${result.image}" alt="${result.title}" />
                 </figure>
